@@ -1,4 +1,6 @@
 require './board'
+require './errors'
+require 'matrix'
 
 # Basic piece class
 class Piece
@@ -12,18 +14,100 @@ class Piece
       [1, 1]
     ]
   }
-  attr_reader :board, :color, :king, :pos
-  def initialize(board, color, pos = nil)
-    @board, @color, @pos = board, color, pos
+  attr_reader :board, :color, :king
+  attr_accessor :pos
+  def initialize(board, color, pos = nil, king = false)
+    @board, @color, @pos = board, color, pos, king
   end
 
   def perform_slide(end_pos)
-    if valid_slide?(end_pos)
-    end
+    raise InvalidMoveError.new('Invalid move') unless valid_slide?(end_pos)
+    move_piece(end_pos)
   end
 
   def perform_jump(end_pos)
+    raise InvalidMoveError.new('Invalid move') unless valid_jump?(end_pos)
+    jumped_pos = find_jumped_pos(end_pos)
+    board[jumped_pos] = nil
+    move_piece(end_pos)
+  end
 
+  # Execute test move sequence
+  def perform_moves!(move_sequence)
+    if valid_jump?(move_sequence[0])
+      move_sequence.each do |move|
+        perform_jump(move)
+      end
+    elsif move_sequence.count == 1
+      perform_slide(move_sequence[0])
+    else
+      raise InvalidMoveError.new('Invalid Move')
+    end
+  end
+
+  # Execute real move sequence
+  def perform_moves(move_sequence)
+    perform_moves!(move_sequence) if valid_move_seq?(move_sequence)
+  end
+
+  # Test for valid move sequence
+  def valid_move_seq?(move_sequence)
+    dup_board = board.dup
+    begin
+      dup_board[pos].perform_moves!(move_sequence)
+    rescue InvalidMoveError => e
+      puts "#{e.message}"
+      return false
+    else
+      return true
+    end
+  end
+
+  # Test to see if valid slide
+  def valid_slide?(end_pos)
+    possible_ends = move_dirs.map { |dir| [row + dir[0], col + dir[1]] }
+    possible_ends = possible_ends.map do |pos|
+      pos if Board.on_board?(pos)
+    end
+
+    possible_ends.include?(end_pos) && board.empty?(end_pos)
+  end
+
+  # Test to see if valid jump
+  def valid_jump?(end_pos)
+    possible_ends = move_dirs.map { |dir| [row + 2 * dir[0], col + 2 * dir[1]] }
+    possible_ends = possible_ends.map do |pos|
+      pos if Board.on_board?(pos)
+    end
+    jumped_pos = find_jumped_pos(end_pos)
+
+    # Valid jump if: right direction, empty landing spot, and jumped square has
+    # a piece of the other color
+    possible_ends.include?(end_pos) &&
+      board.empty?(end_pos) &&
+      board[jumped_pos] &&
+      board[jumped_pos].color != color
+  end
+
+  # Find the location of the jumped checker piece
+  def find_jumped_pos(end_pos)
+    # Use vectors for easy math
+    pos_v = Vector.elements(pos)
+    end_v = Vector.elements(end_pos)
+    jumped_pos = ((pos_v - end_v) / 2 + end_v).to_a
+
+    jumped_pos
+  end
+
+  # Handle piece movement
+  def move_piece(end_pos)
+    board[end_pos] = self
+    board[pos] = nil
+    self.pos = end_pos
+  end
+
+  def dup(new_board)
+    new_piece = Piece.new(new_board, color, pos, king)
   end
 
   private
@@ -47,9 +131,7 @@ class Piece
     end
   end
 
-  # Test to see if valid slide
-  def valid_slide?(end_pos)
-    possible_ends = move_dirs.map { |offset| [row + offset[0], col + offset[1]] }
-    possible_ends.include?(end_pos)  && board[end_pos].empty?
+  def king?
+    king
   end
 end

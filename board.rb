@@ -42,16 +42,43 @@ class Board
 
   # Return true if target position holds empty value (nil)
   def empty?(pos)
-    board[pos].nil?
+    self[pos].nil?
   end
 
   def inspect
-    display = grid.map do |row|
-      row.map do |piece|
-        piece.nil? ? '     ' : piece.color
+    display = grid.map.with_index do |row, row_i|
+      row.map.with_index do |piece, col_i|
+        spot = piece.nil? ? '     ' : piece.color
+        spot.colorize(:background => :red) if (row_i + col_i).even?
+        spot
       end.join('|')
     end
-
+    display.each_with_index do |row, i|
+      display[i] = "#{i} |" + row
+    end
+    puts '     0     1     2     3     4     5     6     7'
     puts display
+  end
+
+  # Class method to see if a position is on the playing board
+  def self.on_board?(pos)
+    pos.all? do |p|
+      p.between?(0, 7)
+    end
+  end
+
+  # Deep dup board
+  def dup
+    new_board = Board.new
+    grid.each_with_index do |row, row_i|
+      row.each_with_index do |piece, col_i|
+        if piece.nil?
+          new_board[[row_i, col_i]] = nil
+        else
+          new_board[[row_i, col_i]] = piece.dup(new_board)
+        end
+      end
+    end
+    new_board
   end
 end
