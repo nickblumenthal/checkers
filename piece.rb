@@ -1,6 +1,7 @@
 require './board'
 require './errors'
 require 'matrix'
+require 'byebug'
 
 # Basic piece class
 class Piece
@@ -14,15 +15,20 @@ class Piece
       [1, 1]
     ]
   }
-  attr_reader :board, :color, :king
-  attr_accessor :pos
+  SYMBOLS = {
+    :regular => { black: " ☻ ", white: " ☺ " },
+    :king => { black: " ★ ", white: " ☆ "}
+  }
+  attr_reader :board, :color
+  attr_accessor :pos, :king
   def initialize(board, color, pos = nil, king = false)
-    @board, @color, @pos = board, color, pos, king
+    @board, @color, @pos, @king = board, color, pos, king
   end
 
   def perform_slide(end_pos)
     raise InvalidMoveError.new('Invalid move') unless valid_slide?(end_pos)
     move_piece(end_pos)
+    self.king = true if king_me?
   end
 
   def perform_jump(end_pos)
@@ -30,6 +36,7 @@ class Piece
     jumped_pos = find_jumped_pos(end_pos)
     board[jumped_pos] = nil
     move_piece(end_pos)
+    self.king = true if king_me?
   end
 
   # Execute test move sequence
@@ -47,7 +54,11 @@ class Piece
 
   # Execute real move sequence
   def perform_moves(move_sequence)
-    perform_moves!(move_sequence) if valid_move_seq?(move_sequence)
+    if valid_move_seq?(move_sequence)
+      perform_moves!(move_sequence)
+    else
+      raise InvalidMoveError.new('Invalid Move')
+    end
   end
 
   # Test for valid move sequence
@@ -110,8 +121,6 @@ class Piece
     new_piece = Piece.new(new_board, color, pos, king)
   end
 
-  private
-
   # Helper method to return row position
   def row
     pos[0]
@@ -125,7 +134,7 @@ class Piece
   # Return possible offset directions
   def move_dirs
     if king?
-      return MOVE_DIRS[:black] + MOVE_DIRS[:white]
+      return (MOVE_DIRS[:black] + MOVE_DIRS[:white])
     else
       return MOVE_DIRS[color]
     end
@@ -134,4 +143,14 @@ class Piece
   def king?
     king
   end
+
+  def king_me?
+    goal_row = (color == :black ? 7 : 0)
+    goal_row == pos[0]
+  end
+
+  def get_symbol
+    king? ? SYMBOLS[:king][color] : SYMBOLS[:regular][color]
+  end
+
 end
